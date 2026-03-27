@@ -16,7 +16,7 @@ type Joint = {
   visibility: number;
 };
 
-type Keypoints = {
+export type Keypoints = {
   timestamp: number;
   leftShoulder: Joint | null;
   rightShoulder: Joint | null;

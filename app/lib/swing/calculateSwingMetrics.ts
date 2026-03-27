@@ -1,24 +1,14 @@
-import type { FrameData } from '../../hooks/usePoseDetection';
+import type { Keypoints } from '../../hooks/useSwingRecorder';
 
 export type SwingAnalysis = {
   metadata: {
     durationMs: number;
-    fps: number;
     handedness: "right" | "left";
   };
-
-  // Key reference points in the swing
-  phases: {
-    setupFrame: number;
-    topFrame: number;
-    impactFrame: number;
-  };
-
 
   // Setup + posture characteristics
   posture: {
     spineAngle: number;        // torso lean at setup
-    stanceWidth: number;       // distance between feet
     kneeFlex: {
       setup: number;
       min: number;
@@ -107,16 +97,78 @@ export type SwingAnalysis = {
     hipRise: number;      // detects early extension
   };
 };
-/**
- * Basic swing metric scaffolding.
- * This is intentionally minimal so you can plug in real calculations later.
- */
-export function calculateSwingMetrics(recordedFrames: FrameData[]): SwingAnalysis {
+
+type context = {
+  recordedFrames: Keypoints[];
+  setupFrame: Keypoints;
+  topFrame: Keypoints;
+  impactFrame: Keypoints;
+};
+
+function calculateMetadata(recordedFrames: Keypoints[]) {
+ return {
+  durationMs: recordedFrames[recordedFrames.length - 1].timestamp - recordedFrames[0].timestamp,
+  handedness: "right"
+ };
+}
+
+function calculatePhases(recordedFrames: Keypoints[]) {
+  let topframe = 0;
+  let impactframe = 0;
+  for (let i = 0; i < recordedFrames.length; i++) {
+    if (recordedFrames[i].leftWrist && recordedFrames[i].leftWrist.y > recordedFrames[topframe].leftWrist.y) {
+      topframe = i;
+    }
+    if (recordedFrames[i].leftWrist && recordedFrames[i].leftWrist.y < recordedFrames[impactframe].leftWrist.y && topframe < i) {
+      impactframe = i;
+    }
+  }
+  return {
+    setupFrame: recordedFrames[0],
+    topFrame: recordedFrames[topframe],
+    impactFrame: recordedFrames[impactframe],
+  };
+}
+
+function calculatePosture(context: context) {
+  // angle between right shoulder and right hip
+  const spineAngle = Math.atan2(context.setupFrame.rightShoulder.y - context.setupFrame.rightHip.y, context.setupFrame.rightShoulder.x - context.setupFrame.rightHip.x);
+  return {
+    spineAngle: 0,
+    kneeFlex: {
+      setup: 0,
+      min: 0,
+      atImpact: 0,
+    },
+    reach: 0,
+  };
+}
+
+export function calculateSwingMetrics(recordedFrames: Keypoints[]): SwingAnalysis {
   if (!recordedFrames.length) {
     return null;
   }
 
+  const metadata = calculateMetadata(recordedFrames);
+  const phases = calculatePhases(recordedFrames);
+  const context = {
+    recordedFrames: recordedFrames,
+    setupFrame: phases.setupFrame,
+    topFrame: phases.topFrame,
+    impactFrame: phases.impactFrame,
+  };
+  const posture = calculatePosture(context);
 
   return null;
 }
 
+// posture: {
+//   spineAngle: number;        // torso lean at setup
+//   stanceWidth: number;       // distance between feet
+//   kneeFlex: {
+//     setup: number;
+//     min: number;
+//     atImpact: number;
+//   };
+//   reach: number;             // hands distance from body at setup
+// };
