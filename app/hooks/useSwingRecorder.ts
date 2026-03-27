@@ -26,6 +26,10 @@ export type Keypoints = {
   rightWrist: Joint | null;
   leftHip: Joint | null;
   rightHip: Joint | null;
+  leftKnee: Joint | null;
+  rightKnee: Joint | null;
+  leftAnkle: Joint | null;
+  rightAnkle: Joint | null;
 };
 
 function extractKeypoints(frameData) {
@@ -86,6 +90,7 @@ export function useSwingRecorder(frameData: FrameData | null): UseSwingRecorderR
   useEffect(() => {
     if (!isRecording || !frameData) return;
     const keyPoints = extractKeypoints(frameData);
+    console.log(keyPoints);
     recordedFramesRef.current.push(keyPoints);
   }, [frameData, isRecording]);
 

@@ -8,13 +8,17 @@ export type SwingAnalysis = {
 
   // Setup + posture characteristics
   posture: {
-    spineAngle: number;        // torso lean at setup
-    kneeFlex: {
+    spineAngle: {
       setup: number;
+      top: number;
+      impact: number;
+    }      // torso lean at setup
+    kneeFlex: {
       min: number;
+      setup: number;
+      top: number;
       atImpact: number;
     };
-    reach: number;             // hands distance from body at setup
   };
 
   // Joint + rotation mechanics
@@ -130,17 +134,85 @@ function calculatePhases(recordedFrames: Keypoints[]) {
   };
 }
 
+function kneeAngle(hip, knee, ankle) {
+  if (!hip || !knee || !ankle) return null;
+
+  const v1 = {
+    x: hip.x - knee.x,
+    y: hip.y - knee.y,
+  };
+
+  const v2 = {
+    x: ankle.x - knee.x,
+    y: ankle.y - knee.y,
+  };
+
+  const dot = v1.x * v2.x + v1.y * v2.y;
+
+  const mag1 = Math.hypot(v1.x, v1.y);
+  const mag2 = Math.hypot(v2.x, v2.y);
+
+  if (mag1 === 0 || mag2 === 0) return null;
+
+  let cosAngle = dot / (mag1 * mag2);
+
+  cosAngle = Math.max(-1, Math.min(1, cosAngle));
+
+   return Math.acos(cosAngle) * (180 / Math.PI);
+
+}
+
 function calculatePosture(context: context) {
   // angle between right shoulder and right hip
-  const spineAngle = Math.atan2(context.setupFrame.rightShoulder.y - context.setupFrame.rightHip.y, context.setupFrame.rightShoulder.x - context.setupFrame.rightHip.x);
+  let  spineAngleStart = null
+  if (context.setupFrame.rightShoulder && context.setupFrame.rightHip) {
+    spineAngleStart = Math.atan2(context.setupFrame.rightShoulder.x - context.setupFrame.rightHip.x, context.setupFrame.rightShoulder.y - context.setupFrame.rightHip.y);
+    spineAngleStart = spineAngleStart * (180 / Math.PI);
+  }
+  let spineAngleTop = null
+  if (context.topFrame.rightShoulder && context.topFrame.rightHip) {
+    spineAngleTop = Math.atan2(context.topFrame.rightShoulder.x - context.topFrame.rightHip.x, context.topFrame.rightShoulder.y - context.topFrame.rightHip.y);
+    spineAngleTop = spineAngleTop * (180 / Math.PI);
+  }``
+  let spineAngleImpact = null
+  if (context.impactFrame.rightShoulder && context.impactFrame.rightHip) {
+    spineAngleImpact = Math.atan2(context.impactFrame.rightShoulder.x - context.impactFrame.rightHip.x, context.impactFrame.rightShoulder.y - context.impactFrame.rightHip.y);
+    spineAngleImpact = spineAngleImpact * (180 / Math.PI);
+  }
+  let kneeFlexStart = null
+  if (context.setupFrame.rightKnee && context.setupFrame.rightAnkle && context.setupFrame.rightHip) {
+    kneeFlexStart = kneeAngle(context.setupFrame.rightHip, context.setupFrame.rightKnee, context.setupFrame.rightAnkle);
+  }
+  let kneeFlexImpact: number | null = null;
+  if (context.impactFrame.rightKnee && context.impactFrame.rightAnkle && context.impactFrame.rightHip) {
+    kneeFlexImpact = kneeAngle(context.impactFrame.rightHip, context.impactFrame.rightKnee, context.impactFrame.rightAnkle);
+  }
+  let kneeFlexTop = null
+  if (context.topFrame.rightKnee && context.topFrame.rightAnkle && context.topFrame.rightHip) {
+    kneeFlexTop = kneeAngle(context.topFrame.rightHip, context.topFrame.rightKnee, context.topFrame.rightAnkle);
+  }
+  let kneeFlexMin = Infinity;
+  for (let i = 0; i < context.recordedFrames.length; i++) {
+    if (context.recordedFrames[i].rightKnee && context.recordedFrames[i].rightAnkle && context.recordedFrames[i].rightHip) {
+      const kneeFlex = kneeAngle(context.recordedFrames[i].rightHip, context.recordedFrames[i].rightKnee, context.recordedFrames[i].rightAnkle);
+      if (kneeFlex !== null && kneeFlex < kneeFlexMin) {
+        kneeFlexMin = kneeFlex;
+      }
+    }
+  }
+
   return {
-    spineAngle: 0,
-    kneeFlex: {
-      setup: 0,
-      min: 0,
-      atImpact: 0,
+    spineAngle: {
+      setup: spineAngleStart,
+      top: spineAngleTop,
+      impact: spineAngleImpact,
     },
-    reach: 0,
+    kneeFlex: {
+      min: kneeFlexMin,
+      setup: kneeFlexStart,
+      top: kneeFlexTop,
+      atImpact: kneeFlexImpact,
+    },
   };
 }
 
@@ -161,14 +233,3 @@ export function calculateSwingMetrics(recordedFrames: Keypoints[]): SwingAnalysi
 
   return null;
 }
-
-// posture: {
-//   spineAngle: number;        // torso lean at setup
-//   stanceWidth: number;       // distance between feet
-//   kneeFlex: {
-//     setup: number;
-//     min: number;
-//     atImpact: number;
-//   };
-//   reach: number;             // hands distance from body at setup
-// };
