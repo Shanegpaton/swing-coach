@@ -9,7 +9,7 @@ type UseSwingRecorderResult = {
   resetRecording: () => void;
 };
 
-type Joint = {
+export type Joint = {
   x: number;
   y: number;
   z: number;
